@@ -1,60 +1,58 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>CO Data Test</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
+  <title>CO Visualization Clone</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     #map { height: 100vh; }
-    #loading { display: none; position: absolute; top: 10px; left: 10px; z-index: 1000; background: white; padding: 5px; }
-    .legend { position: absolute; bottom: 20px; right: 20px; background: white; padding: 10px; }
   </style>
 </head>
 <body>
-  <div id="loading">Loading CO data...</div>
   <div id="map"></div>
-  <input type="text" id="datePicker" placeholder="Select date" style="position: absolute; top: 10px; left: 200px; z-index: 1000;">
-  
-  <div class="legend">
-    <h4>CO (mol/m²)</h4>
-    <div><i style="background:#2b08a8; width: 20px; height: 10px; display: inline-block;"></i> 0.00-0.02</div>
-    <div><i style="background:#f00008; width: 20px; height: 10px; display: inline-block;"></i> >0.12</div>
-    <div id="acquisition-time" style="margin-top: 5px; font-size: 0.8em;"></div>
-  </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-  <script src="https://cdn.jsdelivr.net/npm/leaflet.wms@0.2.0/dist/leaflet.wms.js"></script>
   <script>
-    // CONFIGURATION - REPLACE WITH YOUR CREDENTIALS!
-    const clientId: "sh-3e397c85-30e1-4067-9bec-975aa62d574a",
-    const clientSecret: "oEGik5bM249xxsAowSiSvwmK43qdqsBQ"
+    // 1. Configure credentials
+    const CLIENT_ID = "sh-3e397c85-30e1-4067-9bec-975aa62d574a";
+    const CLIENT_SECRET = "oEGik5bM249xxsAowSiSvwmK43qdqsBQ";
 
-    
-    let accessToken = null;
-    let tokenExpiry = null;
-    
-    async function getAccessToken() {
-      if (accessToken && Date.now() < tokenExpiry) return accessToken;
-      
+    // 2. Get access token
+    async function getToken() {
       const response = await fetch('https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
-          grant_type: 'client_credentials',
           client_id: CLIENT_ID,
-          client_secret: CLIENT_SECRET
+          client_secret: CLIENT_SECRET,
+          grant_type: 'client_credentials'
         })
       });
-      
-      const data = await response.json();
-      accessToken = data.access_token;
-      tokenExpiry = Date.now() + (data.expires_in * 1000) - 30000; // 30s buffer
-      return accessToken;
+      return (await response.json()).access_token;
     }
 
-    // REST OF THE IMPLEMENTATION FROM PREVIOUS RESPONSE GOES HERE
-    // [PASTE ALL THE JAVASCRIPT CODE FROM THE PREVIOUS IMPLEMENTATION]
+    // 3. Initialize map
+    const map = L.map('map').setView([38.40674, 117.69653], 7);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    // 4. Load CO layer
+    async function loadCOLayer() {
+      const token = await getToken();
+      const date = '2023-12-24'; // Test date with known data
+      
+      L.tileLayer.wms('https://sh.dataspace.copernicus.eu/wms', {
+        layers: 'S5P_L2__CO_____',
+        styles: 'RASTER/CO_VISUALIZED',
+        format: 'image/png',
+        transparent: true,
+        time: `${date}T00:00:00Z/${date}T23:59:59Z`,
+        crs: L.CRS.EPSG3857,
+        access_token: token,
+        colorscalerange: '0,0.12',
+        opacity: 0.85
+      }).addTo(map);
+    }
+
+    loadCOLayer();
   </script>
 </body>
 </html>
