@@ -84,8 +84,6 @@ async function loadLayer() {
   }
 }
 
-// Rest of the code remains the same
-
 // Initialize application
 document.addEventListener('DOMContentLoaded', async () => {
   initMap();
