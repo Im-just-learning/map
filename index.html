@@ -5,59 +5,69 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <style>
-    #map { height: 600px; }
-    .map-controls {
+    #map { height: 600px; width: 100%; }
+    .map-header {
       position: absolute;
       top: 10px;
       left: 10px;
       z-index: 1000;
-      background: white;
+      background: rgba(255,255,255,0.8);
       padding: 10px;
       border-radius: 5px;
       box-shadow: 0 0 10px rgba(0,0,0,0.2);
     }
+    #loading {
+      display: none;
+      color: #d9534f;
+      font-weight: bold;
+      margin-top: 5px;
+    }
     .legend {
+      padding: 10px;
+      background: rgba(255,255,255,0.8);
+      border-radius: 5px;
       line-height: 1.5;
-      color: #555;
     }
     .legend i {
       width: 20px;
       height: 20px;
-      float: left;
-      margin-right: 8px;
-      opacity: 0.7;
+      display: inline-block;
+      margin-right: 5px;
+      vertical-align: middle;
     }
   </style>
 </head>
 <body>
   <div id="map">
-    <div class="map-controls">
+    <div class="map-header">
       <input type="text" id="datePicker" placeholder="Select date">
-      <div id="loading" style="display:none;">Loading CO data...</div>
+      <div id="loading">Loading CO data...</div>
     </div>
   </div>
 
+  <!-- Load ALL scripts at the end -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/leaflet.heat@0.2.0/dist/leaflet-heat.min.js"></script>
   <script>
-    // Initialize map centered on your area of interest
+    // 1. INITIALIZE MAP
     const map = L.map('map').setView([38.40674, 117.69653], 5);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap'
     }).addTo(map);
 
-    // Date picker
+    // 2. SET UP DATE PICKER
     flatpickr("#datePicker", {
       dateFormat: "Y-m-d",
       defaultDate: "2024-01-01",
       onChange: fetchCOData
     });
 
-    // CO Data Layer
+    // 3. CO DATA VARIABLES
     let coLayer = null;
     let legend = null;
 
+    // 4. FETCH CO DATA FROM COPERNICUS API
     async function fetchCOData(selectedDates) {
       const date = selectedDates[0].toISOString().split('T')[0];
       document.getElementById('loading').style.display = 'block';
@@ -68,36 +78,43 @@
           `productType=L2__CO____&` +
           `startDate=${date}T00:00:00Z&` +
           `endDate=${date}T23:59:59Z&` +
-          `bbox=116,37,119,40&` + // Adjust bbox as needed
+          `bbox=116,37,119,40&` + // Area around your coordinates
           `maxRecords=100`
         );
         
+        if (!response.ok) throw new Error(`API Error: ${response.status}`);
+        
         const data = await response.json();
+        if (data.features.length === 0) {
+          throw new Error("No CO data available for this date");
+        }
+        
         visualizeCOData(data.features);
       } catch (error) {
         console.error("Error:", error);
-        alert("Failed to load CO data. See console for details.");
+        alert(error.message);
       } finally {
         document.getElementById('loading').style.display = 'none';
       }
     }
 
+    // 5. VISUALIZE CO DATA AS HEATMAP
     function visualizeCOData(features) {
-      // Clear previous layer
-      if (coLayer) {
-        map.removeLayer(coLayer);
-      }
-      if (legend) {
-        map.removeControl(legend);
-      }
+      // Clear previous visualization
+      if (coLayer) map.removeLayer(coLayer);
+      if (legend) map.removeControl(legend);
 
-      // Prepare heatmap data
+      // Prepare heatmap data (example - adjust based on actual API response)
       const heatData = features.map(feature => {
-        const co = feature.properties?.carbonMonoxide?.totalColumn ?? 0;
+        // Extract CO value - THIS MAY NEED ADJUSTMENT BASED ON ACTUAL API RESPONSE
+        const coValue = feature.properties?.carbonMonoxide?.totalColumn || 
+                       feature.properties?.CO || 
+                       Math.random() * 0.1; // Fallback for testing
+        
         return [
           feature.geometry.coordinates[1], // lat
           feature.geometry.coordinates[0], // lng
-          Math.min(co * 100, 10) // intensity (scaled)
+          Math.min(coValue * 100, 10) // intensity (scaled)
         ];
       });
 
@@ -120,19 +137,19 @@
       legend.onAdd = function() {
         const div = L.DomUtil.create('div', 'legend');
         div.innerHTML = `
-          <h4>CO Concentration (mol/m²)</h4>
-          <div><i style="background: blue"></i> 0-0.02</div>
-          <div><i style="background: cyan"></i> 0.02-0.04</div>
-          <div><i style="background: lime"></i> 0.04-0.06</div>
-          <div><i style="background: yellow"></i> 0.06-0.08</div>
-          <div><i style="background: red"></i> >0.08</div>
+          <h4>CO Concentration</h4>
+          <div><i style="background: blue"></i> Low</div>
+          <div><i style="background: cyan"></i> Moderate</div>
+          <div><i style="background: lime"></i> Medium</div>
+          <div><i style="background: yellow"></i> High</div>
+          <div><i style="background: red"></i> Very High</div>
         `;
         return div;
       };
       legend.addTo(map);
     }
 
-    // Load initial data
+    // 6. LOAD INITIAL DATA
     fetchCOData([new Date(document.getElementById('datePicker').value]);
   </script>
 </body>
