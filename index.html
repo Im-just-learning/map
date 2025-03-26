@@ -1,26 +1,32 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Copernicus Map</title>
-  <!-- Leaflet CSS -->
+  <title>CO Monitor</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <!-- Flatpickr CSS -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <style>
-    #map { height: 500px; width: 100%; }
+    #map { height: 600px; }
+    .map-header { 
+      position: absolute; 
+      top: 10px; 
+      left: 10px; 
+      z-index: 1000;
+      background: white;
+      padding: 10px;
+      border-radius: 5px;
+    }
   </style>
 </head>
 <body>
-  <div id="map"></div>
-  <input type="text" id="datePicker" placeholder="Select date">
+  <div id="map">
+    <div class="map-header">
+      <input type="text" id="datePicker" placeholder="Select date">
+    </div>
+  </div>
 
-  <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <!-- Flatpickr JS -->
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-  <!-- Your JS -->
   <script src="script.js"></script>
 </body>
 </html>
+
