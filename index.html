@@ -1,26 +1,139 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Copernicus Map</title>
-  <!-- Leaflet CSS -->
+  <title>CO Monitoring Map</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <!-- Flatpickr CSS -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <style>
-    #map { height: 500px; width: 100%; }
+    #map { height: 600px; }
+    .map-controls {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1000;
+      background: white;
+      padding: 10px;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+    }
+    .legend {
+      line-height: 1.5;
+      color: #555;
+    }
+    .legend i {
+      width: 20px;
+      height: 20px;
+      float: left;
+      margin-right: 8px;
+      opacity: 0.7;
+    }
   </style>
 </head>
 <body>
-  <div id="map"></div>
-  <input type="text" id="datePicker" placeholder="Select date">
+  <div id="map">
+    <div class="map-controls">
+      <input type="text" id="datePicker" placeholder="Select date">
+      <div id="loading" style="display:none;">Loading CO data...</div>
+    </div>
+  </div>
 
-  <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <!-- Flatpickr JS -->
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-  <!-- Your JS -->
-  <script src="script.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet.heat@0.2.0/dist/leaflet-heat.min.js"></script>
+  <script>
+    // Initialize map centered on your area of interest
+    const map = L.map('map').setView([38.40674, 117.69653], 5);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    // Date picker
+    flatpickr("#datePicker", {
+      dateFormat: "Y-m-d",
+      defaultDate: "2024-01-01",
+      onChange: fetchCOData
+    });
+
+    // CO Data Layer
+    let coLayer = null;
+    let legend = null;
+
+    async function fetchCOData(selectedDates) {
+      const date = selectedDates[0].toISOString().split('T')[0];
+      document.getElementById('loading').style.display = 'block';
+      
+      try {
+        const response = await fetch(
+          `https://catalogue.dataspace.copernicus.eu/resto/api/collections/S5P/search.json?` +
+          `productType=L2__CO____&` +
+          `startDate=${date}T00:00:00Z&` +
+          `endDate=${date}T23:59:59Z&` +
+          `bbox=116,37,119,40&` + // Adjust bbox as needed
+          `maxRecords=100`
+        );
+        
+        const data = await response.json();
+        visualizeCOData(data.features);
+      } catch (error) {
+        console.error("Error:", error);
+        alert("Failed to load CO data. See console for details.");
+      } finally {
+        document.getElementById('loading').style.display = 'none';
+      }
+    }
+
+    function visualizeCOData(features) {
+      // Clear previous layer
+      if (coLayer) {
+        map.removeLayer(coLayer);
+      }
+      if (legend) {
+        map.removeControl(legend);
+      }
+
+      // Prepare heatmap data
+      const heatData = features.map(feature => {
+        const co = feature.properties?.carbonMonoxide?.totalColumn ?? 0;
+        return [
+          feature.geometry.coordinates[1], // lat
+          feature.geometry.coordinates[0], // lng
+          Math.min(co * 100, 10) // intensity (scaled)
+        ];
+      });
+
+      // Create heatmap layer
+      coLayer = L.heatLayer(heatData, {
+        radius: 25,
+        blur: 15,
+        maxZoom: 9,
+        gradient: {
+          0.1: 'blue',
+          0.3: 'cyan',
+          0.5: 'lime',
+          0.7: 'yellow',
+          1.0: 'red'
+        }
+      }).addTo(map);
+
+      // Add legend
+      legend = L.control({position: 'bottomright'});
+      legend.onAdd = function() {
+        const div = L.DomUtil.create('div', 'legend');
+        div.innerHTML = `
+          <h4>CO Concentration (mol/m²)</h4>
+          <div><i style="background: blue"></i> 0-0.02</div>
+          <div><i style="background: cyan"></i> 0.02-0.04</div>
+          <div><i style="background: lime"></i> 0.04-0.06</div>
+          <div><i style="background: yellow"></i> 0.06-0.08</div>
+          <div><i style="background: red"></i> >0.08</div>
+        `;
+        return div;
+      };
+      legend.addTo(map);
+    }
+
+    // Load initial data
+    fetchCOData([new Date(document.getElementById('datePicker').value]);
+  </script>
 </body>
 </html>
