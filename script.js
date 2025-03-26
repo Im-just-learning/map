@@ -1,35 +1,32 @@
-// Initialize the map
-const map = L.map('map').setView([38.40674, 117.69653], 7); // Default lat/lng/zoom from your URL
+// Initialize map
+const map = L.map('map').setView([38.40674, 117.69653], 5);
 
-// Add a base map (e.g., OpenStreetMap)
+// Add base layer (OpenStreetMap)
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '© OpenStreetMap contributors'
+  attribution: '© OpenStreetMap'
 }).addTo(map);
 
-// Initialize Flatpickr (calendar)
+// Date picker
 flatpickr("#datePicker", {
   dateFormat: "Y-m-d",
-  defaultDate: "2024-12-24", // Default date from your URL
-  onChange: function(selectedDates) {
-    const selectedDate = selectedDates[0].toISOString().split('T')[0];
-    updateCopernicusLayer(selectedDate);
+  defaultDate: "2024-12-24",
+  onChange: (selectedDates) => {
+    const date = selectedDates[0].toISOString().split('T')[0];
+    updateCopernicusLayer(date);
   }
 });
 
-// Function to update the Copernicus WMS layer
+// Load Copernicus layer (with CORS proxy)
 function updateCopernicusLayer(date) {
   if (window.copernicusLayer) map.removeLayer(window.copernicusLayer);
   
-  // Use a proxy (replace "YOUR_PROXY_URL" with a free service like https://cors-anywhere.herokuapp.com/)
   const proxyUrl = "https://cors-anywhere.herokuapp.com/";
   const wmsUrl = `${proxyUrl}https://wms.dataspace.copernicus.eu/wms?request=GetMap&layers=S5_CO_CDAS&time=${date}&format=image/png&transparent=true`;
   
-  window.copernicusLayer = L.tileLayer(wmsUrl).addTo(map);
+  window.copernicusLayer = L.tileLayer(wmsUrl, {
+    attribution: 'Copernicus'
+  }).addTo(map);
 }
 
-  // Add new layer with selected date
-  window.copernicusLayer = L.tileLayer.wms('https://wms.dataspace.copernicus.eu/wms', {
-    layers: 'S5_CO_CDAS', // Dataset ID from your URL
-    format: 'image/png',
-    transparent: true,
-    time: date, // Dynamic date
+// Load default layer
+updateCopernicusLayer("2024-12-24");
