@@ -1,28 +1,53 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Copernicus Atmosphere Viewer</title>
-  <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <title>Copernicus CO Viewer</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <style>
+        body { margin: 0; font-family: Arial; }
+        #map { height: 100vh; }
+        #controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+            background: rgba(255,255,255,0.9);
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.9);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+        }
+        .legend-color {
+            width: 20px;
+            height: 12px;
+            display: inline-block;
+        }
+    </style>
 </head>
 <body>
-  <div id="map"></div>
-  
-  <div id="controls">
-    <select id="layerSelector">
-      <option value="CO">Carbon Monoxide (CO)</option>
-      <option value="NO2">Nitrogen Dioxide (NO2)</option>
-    </select>
-    <input type="date" id="dateInput" value="2023-06-15">
-    <div id="loading">Loading data...</div>
-  </div>
-  
-  <div class="legend">
-    <h4 id="legendTitle">CO Column (mol/m²)</h4>
-    <div id="legendColors"></div>
-  </div>
+    <div id="map"></div>
+    
+    <div id="controls">
+        <input type="date" id="dateInput" value="2023-06-15">
+        <div id="loading">Loading data...</div>
+    </div>
+    
+    <div class="legend">
+        <h4>CO Column (mol/m²)</h4>
+        <div><span class="legend-color" style="background:#2b08a8"></span> 0.00-0.02</div>
+        <div><span class="legend-color" style="background:#f00008"></span> >0.12</div>
+    </div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="script.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet.wms@0.2.0/dist/leaflet.wms.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
