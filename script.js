@@ -12,21 +12,27 @@ flatpickr("#datePicker", {
   defaultDate: "2024-12-24",
   onChange: (selectedDates) => {
     const date = selectedDates[0].toISOString().split('T')[0];
-    updateCopernicusLayer(date);
+    updateCOLayer(date); // Load CO data for the selected date
   }
 });
 
-// Load Copernicus layer (with CORS proxy)
-function updateCopernicusLayer(date) {
-  if (window.copernicusLayer) map.removeLayer(window.copernicusLayer);
-  
+// Function to load Copernicus CO layer
+function updateCOLayer(date) {
+  if (window.coLayer) map.removeLayer(window.coLayer);
+
+  // Use a proxy to bypass CORS (replace with your own if needed)
   const proxyUrl = "https://cors-anywhere.herokuapp.com/";
-  const wmsUrl = `${proxyUrl}https://wms.dataspace.copernicus.eu/wms?request=GetMap&layers=S5_CO_CDAS&time=${date}&format=image/png&transparent=true`;
-  
-  window.copernicusLayer = L.tileLayer(wmsUrl, {
-    attribution: 'Copernicus'
+  const wmsUrl = `${proxyUrl}https://wms.dataspace.copernicus.eu/wms`;
+
+  window.coLayer = L.tileLayer.wms(wmsUrl, {
+    layers: 'S5_CO_CDAS',       // Copernicus CO dataset
+    styles: 'RASTER/CO_VISUALIZED', // Style for CO visualization
+    format: 'image/png',
+    transparent: true,
+    time: date,                 // Dynamic date
+    attribution: 'Copernicus CO Data'
   }).addTo(map);
 }
 
-// Load default layer
-updateCopernicusLayer("2024-12-24");
+// Load default CO layer
+updateCOLayer("2024-12-24");
