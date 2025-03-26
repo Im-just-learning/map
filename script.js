@@ -2,8 +2,8 @@
 const AUTH_URL = 'https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token';
 const CATALOG_URL = 'https://catalogue.dataspace.copernicus.eu/odata/v1/Products';
 const PRODUCT_ID = 'L2__CO____'; // Sentinel-5P CO product type
-const CLIENT_ID = 'your-client-id'; // Replace with your credentials
-const CLIENT_SECRET = 'your-client-secret'; // Replace with your credentials
+const CLIENT_ID = "sh-3e397c85-30e1-4067-9bec-975aa62d574a",
+const CLIENT_SECRET = "oEGik5bM249xxsAowSiSvwmK43qdqsBQ",
 
 // Get authentication token
 async function getAccessToken() {
