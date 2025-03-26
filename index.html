@@ -3,47 +3,24 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Copernicus Data Integration</title>
-  <!-- Leaflet CSS (for maps) -->
- <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <!-- Flatpickr CSS (for calendar) -->
+  <title>Copernicus Map</title>
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Flatpickr CSS -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 20px;
-    }
-    #map {
-      height: 500px;
-      width: 100%;
-      margin-top: 20px;
-      border: 1px solid #ccc;
-    }
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-    .controls {
-      margin-bottom: 20px;
-    }
+    #map { height: 500px; width: 100%; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Copernicus Data Viewer</h1>
-    <div class="controls">
-      <label for="datePicker">Select Date:</label>
-      <input type="text" id="datePicker" placeholder="YYYY-MM-DD">
-    </div>
-    <div id="map"></div>
-  </div>
+  <div id="map"></div>
+  <input type="text" id="datePicker" placeholder="Select date">
 
   <!-- Leaflet JS -->
- <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <!-- Flatpickr JS -->
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-  <!-- Custom JS -->
+  <!-- Your JS -->
   <script src="script.js"></script>
 </body>
 </html>
