@@ -1,93 +1,76 @@
-// Map initialization
-const map = L.map('map').setView([20.27594, -74.66599], 4);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap'
-}).addTo(map);
+// 1. Initialize Map
+const map = L.map('map').setView([0, 0], 2);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-// CO Layer Management
+// 2. CO Layer Management
 let coLayer = null;
-let tokenRefreshInterval = null;
 
-async function createCOLayer(date) {
-    const token = await getAccessToken();
-    return L.tileLayer.wms('https://sh.dataspace.copernicus.eu/wms', {
-        layers: 'S5_CO_CDAS',
-        styles: 'RASTER/CO_VISUALIZED',
-        format: 'image/png',
-        transparent: true,
-        version: '1.3.0',
-        crs: L.CRS.EPSG3857,
-        access_token: token,
-        time: date,
-        attribution: 'Copernicus Atmosphere Monitoring Service'
-    });
+async function fetchCOProducts(date) {
+  const formattedDate = date.toISOString().split('T')[0];
+  const response = await fetch(
+    `https://catalogue.dataspace.copernicus.eu/resto/api/collections/S5P/search.json?` +
+    `productType=L2__CO____&` +
+    `startDate=${formattedDate}T00:00:00Z&` +
+    `endDate=${formattedDate}T23:59:59Z&` +
+    `maxRecords=10`
+  );
+  
+  const data = await response.json();
+  window.COPERNICUS_DATA.products = data.features;
+  return data.features[0]; // Get most recent product
 }
 
-async function updateCOLayer(date) {
-    document.getElementById('loading').style.display = 'block';
-    
-    try {
-        // Clear existing layer
-        if (coLayer) {
-            map.removeLayer(coLayer);
-            coLayer = null;
-        }
-
-        // Create new layer
-        coLayer = await createCOLayer(date);
-        coLayer.addTo(map);
-
-        // Set up token refresh
-        if (!tokenRefreshInterval) {
-            tokenRefreshInterval = setInterval(async () => {
-                try {
-                    const newToken = await getAccessToken();
-                    coLayer.setParams({ access_token: newToken });
-                } catch (error) {
-                    console.error("Token refresh failed:", error);
-                }
-            }, 300000); // 5 minutes
-        }
-
-    } catch (error) {
-        console.error("CO Layer Error:", error);
-        alert(`Failed to load data: ${error.message}`);
-    } finally {
-        document.getElementById('loading').style.display = 'none';
-    }
+async function displayCOProduct(product) {
+  if (coLayer) map.removeLayer(coLayer);
+  
+  // Get WMS URL from product metadata
+  const wmsUrl = product.properties.services.find(s => s.type === 'wms').url;
+  const layerName = product.properties.productIdentifier.split('/').pop();
+  
+  coLayer = L.tileLayer.wms(wmsUrl, {
+    layers: layerName,
+    styles: 'RASTER/CO_VISUALIZED',
+    format: 'image/png',
+    transparent: true,
+    version: '1.3.0',
+    attribution: 'Sentinel-5P CO Data'
+  }).addTo(map);
+  
+  // Update map view to product coverage
+  const [minX, minY, maxX, maxY] = product.properties.bbox;
+  map.fitBounds([[minY, minX], [maxY, maxX]]);
 }
 
-// Date picker
-const datePicker = flatpickr("#datePicker", {
-    dateFormat: "Y-m-d",
-    defaultDate: "2024-01-15",
-    maxDate: "today",
-    onChange: (dates) => updateCOLayer(dates[0].toISOString().split('T')[0])
+// 3. Date Picker Integration
+flatpickr("#datePicker", {
+  dateFormat: "Y-m-d",
+  defaultDate: new Date(),
+  maxDate: new Date(),
+  onChange: async (dates) => {
+    const product = await fetchCOProducts(dates[0]);
+    await displayCOProduct(product);
+  }
 });
 
-// Legend
+// 4. Legend for CO Values
 const legend = L.control({position: 'bottomright'});
 legend.onAdd = () => {
-    const div = L.DomUtil.create('div', 'legend');
-    div.innerHTML = `
-        <h4>CO Column (mol/m²)</h4>
-        <div><i style="background:#2b08a8"></i> 0.00-0.02</div>
-        <div><i style="background:#1b4df0"></i> 0.02-0.04</div>
-        <div><i style="background:#00a8f0"></i> 0.04-0.06</div>
-        <div><i style="background:#00f0a8"></i> 0.06-0.08</div>
-        <div><i style="background:#a8f000"></i> 0.08-0.10</div>
-        <div><i style="background:#f0a800"></i> 0.10-0.12</div>
-        <div><i style="background:#f00008"></i> >0.12</div>
-        <div style="margin-top:5px;font-size:0.8em">Data: Sentinel-5P</div>
-    `;
-    return div;
+  const div = L.DomUtil.create('div', 'legend');
+  div.innerHTML = `
+    <h4>CO (mol/m²)</h4>
+    <div><i style="background:#0000FF"></i> 0-0.02</div>
+    <div><i style="background:#00FFFF"></i> 0.02-0.04</div>
+    <div><i style="background:#00FF00"></i> 0.04-0.06</div>
+    <div><i style="background:#FFFF00"></i> 0.06-0.08</div>
+    <div><i style="background:#FF0000"></i> >0.08</div>
+  `;
+  return div;
 };
 legend.addTo(map);
 
-// Initial load
-updateCOLayer(datePicker.input.value);
-
-// Cleanup on window close
-window.addEventListener('beforeunload', () => {
-    if (tokenRefreshInterval) clearInterval(tokenRefreshInterval);
-});
+// 5. Initial Load
+(async () => {
+  const today = new Date();
+  const product = await fetchCOProducts(today);
+  await displayCOProduct(product);
+})();
