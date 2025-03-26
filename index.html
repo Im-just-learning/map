@@ -5,6 +5,19 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <style>
+  .leaflet-layer {
+    mix-blend-mode: multiply;
+    opacity: 0.85;
+  }
+  .leaflet-tile {
+    filter: hue-rotate(-5deg) saturate(1.1);
+  }
+  .legend i {
+    width: 18px;
+    height: 18px;
+    margin-right: 6px;
+    border: 1px solid #333;
+  }
     #map { 
       height: 600px; 
       width: 100%; 
