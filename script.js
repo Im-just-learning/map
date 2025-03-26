@@ -1,38 +1,45 @@
 // Initialize map
-const map = L.map('map').setView([38.40674, 117.69653], 5);
+const map = L.map('map').setView([38.4, 117.7], 5);
 
-// Add base layer (OpenStreetMap)
+// Add base map
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '© OpenStreetMap'
 }).addTo(map);
 
-// Date picker
+// Mock CO data (semi-transparent orange layer)
+const mockCOLayer = L.rectangle([[30, 100], [45, 130]], {
+  color: '#ff7800',
+  fillColor: '#ff7800',
+  fillOpacity: 0.5,
+  weight: 1
+}).addTo(map);
+
+// Add legend
+const legend = L.control({position: 'bottomright'});
+legend.onAdd = function() {
+  const div = L.DomUtil.create('div', 'info legend');
+  div.innerHTML = `
+    <h4>CO Levels (mock data)</h4>
+    <div style="background:#ff7800; opacity:0.5; height:20px;"></div>
+    <p>High Concentration</p>
+  `;
+  return div;
+};
+legend.addTo(map);
+
+// Date picker (functional but won't change real data)
 flatpickr("#datePicker", {
   dateFormat: "Y-m-d",
   defaultDate: "2024-12-24",
-  onChange: (selectedDates) => {
+  onChange: function(selectedDates) {
     const date = selectedDates[0].toISOString().split('T')[0];
-    updateCOLayer(date); // Load CO data for the selected date
+    alert(`Date changed to ${date}\n(Mock demo - real data requires API)`);
+    
+    // For demo: Move the mock layer slightly
+    mockCOLayer.setBounds([
+      [30 + Math.random()*5, 100 + Math.random()*5],
+      [45 + Math.random()*5, 130 + Math.random()*5]
+    ]);
   }
 });
 
-// Function to load Copernicus CO layer
-function updateCOLayer(date) {
-  if (window.coLayer) map.removeLayer(window.coLayer);
-
-  // Use a proxy to bypass CORS (replace with your own if needed)
-  const proxyUrl = "https://cors-anywhere.herokuapp.com/";
-  const wmsUrl = `${proxyUrl}https://wms.dataspace.copernicus.eu/wms`;
-
-  window.coLayer = L.tileLayer.wms(wmsUrl, {
-    layers: 'S5_CO_CDAS',       // Copernicus CO dataset
-    styles: 'RASTER/CO_VISUALIZED', // Style for CO visualization
-    format: 'image/png',
-    transparent: true,
-    time: date,                 // Dynamic date
-    attribution: 'Copernicus CO Data'
-  }).addTo(map);
-}
-
-// Load default CO layer
-updateCOLayer("2024-12-24");
