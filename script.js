@@ -52,7 +52,12 @@ async function fetchCOProducts(date) {
   document.getElementById('loading').style.display = 'block';
   
   try {
-    const formattedDate = "date.toISOString().split('T')[0]";
+    // Validate the date parameter
+    if (!(date instanceof Date) || isNaN(date)) {
+      throw new Error("Invalid date provided");
+    }
+    
+    const formattedDate = date.toISOString().split('T')[0];
     const token = await getAccessToken();
     
     const response = await fetch(
