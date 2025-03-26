@@ -1,159 +1,85 @@
-// 1. INITIALIZE MAP
-const map = L.map('map').setView([38.40674, 117.69653], 5);
+// Initialize map with Copernicus' default view
+const map = L.map('map').setView([20.27594, -74.66599], 4);
+
+// Add base map
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap'
 }).addTo(map);
 
-// 2. SET UP DATE PICKER
-const datePicker = flatpickr("#datePicker", {
-    dateFormat: "Y-m-d",
-    defaultDate: "2024-01-15",  // Default date with available data
-    maxDate: "today",
-    onChange: fetchCOData
+// 1. Configure Copernicus WMS Layer (CO Visualization)
+const copernicusCOLayer = L.tileLayer.wms('https://wms.dataspace.copernicus.eu/wms', {
+    layers: 'S5_CO_CDAS',
+    styles: 'RASTER/CO_VISUALIZED',
+    format: 'image/png',
+    transparent: true,
+    version: '1.3.0',
+    attribution: 'Copernicus Atmosphere Monitoring Service'
 });
 
-// 3. GLOBALS FOR DATA VISUALIZATION
-let coLayer = null;
-let legend = null;
-let lastFetch = null;
-
-// 4. MAIN FUNCTION TO FETCH CO DATA
-async function fetchCOData(selectedDates) {
-    const date = selectedDates[0].toISOString().split('T')[0];
-    
-    // Avoid duplicate requests
-    if (lastFetch === date) return;
-    lastFetch = date;
-    
-    showLoading(true);
-    
-    try {
-        const response = await fetchWithTimeout(
-            `https://catalogue.dataspace.copernicus.eu/resto/api/collections/S5P/search.json?` +
-            `productType=L2__CO____&` +
-            `startDate=${date}T00:00:00Z&` +
-            `endDate=${date}T23:59:59Z&` +
-            `bbox=116,37,119,40&` +  // Adjusted bounding box for China region
-            `maxRecords=50&` +
-            `cloudCover=[0,30]`,      // Only clearer skies
-            { timeout: 10000 }        // 10-second timeout
-        );
-        
-        if (!response.ok) throw new Error(`Server error: ${response.status}`);
-        
-        const data = await response.json();
-        
-        if (!data.features || data.features.length === 0) {
-            throw new Error("No CO data available for this date");
-        }
-        
-        visualizeCOData(data.features);
-    } catch (error) {
-        console.error("Fetch error:", error);
-        showError(`Failed to load data: ${error.message}`);
-    } finally {
-        showLoading(false);
+// 2. Set up date picker with enhanced options
+const datePicker = flatpickr("#datePicker", {
+    dateFormat: "Y-m-d",
+    defaultDate: "2024-01-15",
+    maxDate: "today", // Restrict to past dates
+    onChange: function(selectedDates) {
+        const date = selectedDates[0].toISOString().split('T')[0];
+        updateCOLayer(date);
     }
-}
+});
 
-// 5. VISUALIZE CO DATA AS HEATMAP
-function visualizeCOData(features) {
-    // Clear previous layers
-    if (coLayer) map.removeLayer(coLayer);
-    if (legend) map.removeControl(legend);
+// 3. Update WMS layer with new date
+function updateCOLayer(date) {
+    // Show loading state
+    document.getElementById('loading').style.display = 'block';
     
-    // Process API data
-    const heatData = features.map(feature => {
-        // Extract CO value - THIS IS CRUCIAL TO VERIFY
-        const coValue = getCOValueFromFeature(feature);
-        return [
-            feature.geometry.coordinates[1],  // lat
-            feature.geometry.coordinates[0],  // lng
-            normalizeCOValue(coValue)         // intensity
-        ];
+    copernicusCOLayer.setParams({
+        time: date,
+        // Optional: Add cloud coverage filter (0-30%)
+        // cql_filter: "cloudCover<=30" 
     });
     
-    // Create heatmap layer
-    coLayer = L.heatLayer(heatData, {
-        radius: 25,
-        blur: 15,
-        maxZoom: 10,
-        gradient: getCOGradient(),
-        minOpacity: 0.5
-    }).addTo(map);
+    // Add layer if not already on map
+    if (!map.hasLayer(copernicusCOLayer)) {
+        copernicusCOLayer.addTo(map);
+    }
     
-    // Add legend
-    addLegend();
+    // Hide loading after short delay (better UX)
+    setTimeout(() => {
+        document.getElementById('loading').style.display = 'none';
+    }, 500);
 }
 
-// 6. DATA PROCESSING HELPERS
-function getCOValueFromFeature(feature) {
-    /* Verify this matches your API response structure!
-    Check the actual response in browser DevTools > Network tab */
-    return feature.properties?.carbonMonoxide?.totalColumn ||  // Most likely path
-           feature.properties?.CO?.value ||                   // Alternative path
-           0.02;                                             // Fallback
-}
+// 4. Add professional legend (matches Copernicus exactly)
+const legend = L.control({position: 'bottomright'});
+legend.onAdd = function() {
+    const div = L.DomUtil.create('div', 'legend');
+    div.innerHTML = `
+        <h4>CO Column (mol/m²)</h4>
+        <div><i style="background:#2b08a8"></i> 0.00-0.02</div>
+        <div><i style="background:#1b4df0"></i> 0.02-0.04</div>
+        <div><i style="background:#00a8f0"></i> 0.04-0.06</div>
+        <div><i style="background:#00f0a8"></i> 0.06-0.08</div>
+        <div><i style="background:#a8f000"></i> 0.08-0.10</div>
+        <div><i style="background:#f0a800"></i> 0.10-0.12</div>
+        <div><i style="background:#f00008"></i> >0.12</div>
+        <div style="margin-top:5px;font-size:0.8em">Data: Sentinel-5P</div>
+    `;
+    return div;
+};
+legend.addTo(map);
 
-function normalizeCOValue(value) {
-    // Convert scientific value to heatmap intensity (0-1)
-    return Math.min(value * 100, 1);
-}
+// 5. Initial load
+updateCOLayer(datePicker.input.value);
 
-function getCOGradient() {
-    return {
-        0.1: '#0000FF',  // blue (low)
-        0.3: '#00FFFF',  // cyan
-        0.5: '#00FF00',  // green
-        0.7: '#FFFF00',  // yellow
-        0.9: '#FF0000'   // red (high)
-    };
-}
+// 6. Error handling for WMS
+copernicusCOLayer.on('load', function() {
+    document.getElementById('loading').style.display = 'none';
+});
 
-// 7. UI HELPERS
-function addLegend() {
-    legend = L.control({position: 'bottomright'});
-    legend.onAdd = () => {
-        const div = L.DomUtil.create('div', 'legend');
-        div.innerHTML = `
-            <h4>CO Concentration (mol/m²)</h4>
-            <div><i style="background:#0000FF"></i> 0-0.02</div>
-            <div><i style="background:#00FFFF"></i> 0.02-0.04</div>
-            <div><i style="background:#00FF00"></i> 0.04-0.06</div>
-            <div><i style="background:#FFFF00"></i> 0.06-0.08</div>
-            <div><i style="background:#FF0000"></i> >0.08</div>
-        `;
-        return div;
-    };
-    legend.addTo(map);
-}
+copernicusCOLayer.on('loading', function() {
+    document.getElementById('loading').style.display = 'block';
+});
 
-function showLoading(show) {
-    document.getElementById('loading').style.display = show ? 'block' : 'none';
-}
-
-function showError(message) {
-    L.popup()
-        .setLatLng(map.getCenter())
-        .setContent(`<div style="color:red;">${message}</div>`)
-        .openOn(map);
-}
-
-// 8. UTILITY FUNCTIONS
-async function fetchWithTimeout(url, options = {}) {
-    const { timeout = 8000 } = options;
-    
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), timeout);
-    
-    const response = await fetch(url, {
-        ...options,
-        signal: controller.signal  
-    });
-    
-    clearTimeout(id);
-    return response;
-}
-
-// 9. INITIAL LOAD
-fetchCOData([new Date(datePicker.input.value)]);
+copernicusCOLayer.on('tileerror', function() {
+    alert('Failed to load CO data. The server may be unavailable or your access token expired.');
+});
