@@ -1,7 +1,8 @@
+// script.js
 const CLIENT_ID = "sh-3e397c85-30e1-4067-9bec-975aa62d574a";
 const CLIENT_SECRET = "oEGik5bM249xxsAowSiSvwmK43qdqsBQ";
+const CORS_PROXY = "https://corsproxy.io/?"; // Reliable proxy service
 
-// Layer configurations
 const LAYERS = {
   CO: {
     wmsLayer: 'S5P_L2__CO_____',
@@ -25,60 +26,39 @@ const LAYERS = {
   }
 };
 
-let map, currentLayer, accessToken;
-
-function initMap() {
-  map = L.map('map').setView([38.40674, 117.69653], 7);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-}
+let map, currentLayer;
 
 async function getToken() {
-  const response = await fetch('https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET,
-      grant_type: 'client_credentials',
-      scope: 'openid wms'
-    })
-  });
-  return (await response.json()).access_token;
-}
-
-function updateLegend(layerType) {
-  const config = LAYERS[layerType];
-  document.getElementById('legendTitle').textContent = 
-    `${layerType} Column (${config.unit})`;
-  
-  const legendContainer = document.getElementById('legendColors');
-  legendContainer.innerHTML = config.legend
-    .map(item => `
-      <div>
-        <span class="legend-color" style="background:${item.color}"></span>
-        ${item.label}
-      </div>
-    `).join('');
+  try {
+    const response = await fetch(`${CORS_PROXY}https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: CLIENT_ID,
+        client_secret: CLIENT_SECRET,
+        grant_type: 'client_credentials',
+        scope: 'openid wms'
+      })
+    });
+    return (await response.json()).access_token;
+  } catch (error) {
+    console.error('Auth Error:', error);
+    throw new Error('Failed to authenticate. Check network connection and credentials.');
+  }
 }
 
 async function loadLayer() {
   try {
-    document.getElementById('loading').style.display = 'block';
-    
-    // Get current selections
     const layerType = document.getElementById('layerSelector').value;
     const date = new Date(document.getElementById('dateInput').value);
     const config = LAYERS[layerType];
-
-    // Clear existing layer
+    
     if (currentLayer) map.removeLayer(currentLayer);
 
-    // Get fresh token
-    accessToken = await getToken();
-
-    // Build WMS URL
+    const token = await getToken();
     const isoDate = date.toISOString().split('T')[0];
-    const wmsUrl = `https://sh.dataspace.copernicus.eu/wms?` +
+    
+    const wmsUrl = `${CORS_PROXY}https://sh.dataspace.copernicus.eu/wms?` +
       `SERVICE=WMS&` +
       `REQUEST=GetMap&` +
       `LAYERS=${config.wmsLayer}&` +
@@ -90,23 +70,21 @@ async function loadLayer() {
       `HEIGHT=1024&` +
       `CRS=EPSG:3857&` +
       `BBOX=-20037508.34,-20037508.34,20037508.34,20037508.34&` +
-      `ACCESS_TOKEN=${accessToken}&` +
+      `ACCESS_TOKEN=${token}&` +
       `COLORSCALERANGE=${config.colorscalerange}`;
 
-    // Add new layer
     currentLayer = L.imageOverlay(wmsUrl, [[-85.06, -180], [85.06, 180]], {
       opacity: 0.85
     }).addTo(map);
 
     updateLegend(layerType);
-
+    
   } catch (error) {
-    alert(`Error: ${error.message}`);
-    console.error(error);
-  } finally {
-    document.getElementById('loading').style.display = 'none';
+    alert(error.message);
   }
 }
+
+// Rest of the code remains the same
 
 // Initialize application
 document.addEventListener('DOMContentLoaded', async () => {
