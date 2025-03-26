@@ -1,45 +1,57 @@
 // Initialize map
 const map = L.map('map').setView([38.4, 117.7], 5);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-// Add base map
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '© OpenStreetMap'
-}).addTo(map);
-
-// Mock CO data (semi-transparent orange layer)
-const mockCOLayer = L.rectangle([[30, 100], [45, 130]], {
-  color: '#ff7800',
-  fillColor: '#ff7800',
-  fillOpacity: 0.5,
-  weight: 1
-}).addTo(map);
-
-// Add legend
-const legend = L.control({position: 'bottomright'});
-legend.onAdd = function() {
-  const div = L.DomUtil.create('div', 'info legend');
-  div.innerHTML = `
-    <h4>CO Levels (mock data)</h4>
-    <div style="background:#ff7800; opacity:0.5; height:20px;"></div>
-    <p>High Concentration</p>
-  `;
-  return div;
-};
-legend.addTo(map);
-
-// Date picker (functional but won't change real data)
+// Date picker
 flatpickr("#datePicker", {
   dateFormat: "Y-m-d",
   defaultDate: "2024-12-24",
-  onChange: function(selectedDates) {
-    const date = selectedDates[0].toISOString().split('T')[0];
-    alert(`Date changed to ${date}\n(Mock demo - real data requires API)`);
-    
-    // For demo: Move the mock layer slightly
-    mockCOLayer.setBounds([
-      [30 + Math.random()*5, 100 + Math.random()*5],
-      [45 + Math.random()*5, 130 + Math.random()*5]
-    ]);
-  }
+  onChange: fetchCOData
 });
 
+// Fetch CO data from Copernicus API
+async function fetchCOData(selectedDates) {
+  const date = selectedDates[0].toISOString().split('T')[0];
+  
+  try {
+    const response = await fetch(
+      `https://catalogue.dataspace.copernicus.eu/resto/api/collections/S5P/search.json?&productType=L2__CO____&startDate=${date}&endDate=${date}&maxRecords=10`
+    );
+    const data = await response.json();
+    
+    displayCOData(data.features);
+  } catch (error) {
+    console.error("Error fetching CO data:", error);
+    alert("Failed to load CO data. Check console for details.");
+  }
+}
+
+// Display CO data on map
+function displayCOData(features) {
+  // Clear previous markers
+  if (window.coMarkers) {
+    window.coMarkers.forEach(marker => map.removeLayer(marker));
+  }
+  
+  window.coMarkers = [];
+  
+  features.forEach(feature => {
+    const coValue = feature.properties.co; // Adjust based on actual API response
+    const marker = L.circleMarker(
+      [feature.geometry.coordinates[1], feature.geometry.coordinates[0]],
+      {
+        radius: 10,
+        color: getCOColor(coValue),
+        fillOpacity: 0.8
+      }
+    ).bindPopup(`CO: ${coValue} ppm`).addTo(map);
+    
+    window.coMarkers.push(marker);
+  });
+}
+
+// Color coding based on CO levels
+function getCOColor(value) {
+  return value > 0.5 ? '#ff0000' : 
+         value > 0.2 ? '#ff8000' : '#ffff00';
+}
