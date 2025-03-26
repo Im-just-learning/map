@@ -1,15 +1,37 @@
-// Configuration
 const CLIENT_ID = "sh-3e397c85-30e1-4067-9bec-975aa62d574a";
 const CLIENT_SECRET = "oEGik5bM249xxsAowSiSvwmK43qdqsBQ";
-let map, coLayer, accessToken;
 
-// Initialize map
+// Layer configurations
+const LAYERS = {
+  CO: {
+    wmsLayer: 'S5P_L2__CO_____',
+    style: 'RASTER/CO_VISUALIZED',
+    colorscalerange: '0,0.12',
+    unit: 'mol/m²',
+    legend: [
+      { color: '#2b08a8', label: '0.00-0.02' },
+      { color: '#f00008', label: '>0.12' }
+    ]
+  },
+  NO2: {
+    wmsLayer: 'S5P_L2__NO2____',
+    style: 'RASTER/NO2_VISUALIZED',
+    colorscalerange: '0,0.0002',
+    unit: 'mol/m²',
+    legend: [
+      { color: '#2b08a8', label: '0-0.00002' },
+      { color: '#f00008', label: '>0.0002' }
+    ]
+  }
+};
+
+let map, currentLayer, accessToken;
+
 function initMap() {
   map = L.map('map').setView([38.40674, 117.69653], 7);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 }
 
-// Get OAuth token with WMS scope
 async function getToken() {
   const response = await fetch('https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token', {
     method: 'POST',
@@ -24,24 +46,43 @@ async function getToken() {
   return (await response.json()).access_token;
 }
 
-// Load CO layer
-async function loadCOLayer(date) {
+function updateLegend(layerType) {
+  const config = LAYERS[layerType];
+  document.getElementById('legendTitle').textContent = 
+    `${layerType} Column (${config.unit})`;
+  
+  const legendContainer = document.getElementById('legendColors');
+  legendContainer.innerHTML = config.legend
+    .map(item => `
+      <div>
+        <span class="legend-color" style="background:${item.color}"></span>
+        ${item.label}
+      </div>
+    `).join('');
+}
+
+async function loadLayer() {
   try {
     document.getElementById('loading').style.display = 'block';
     
-    // Refresh token if needed
-    accessToken = await getToken();
-    
+    // Get current selections
+    const layerType = document.getElementById('layerSelector').value;
+    const date = new Date(document.getElementById('dateInput').value);
+    const config = LAYERS[layerType];
+
     // Clear existing layer
-    if (coLayer) map.removeLayer(coLayer);
+    if (currentLayer) map.removeLayer(currentLayer);
+
+    // Get fresh token
+    accessToken = await getToken();
 
     // Build WMS URL
     const isoDate = date.toISOString().split('T')[0];
     const wmsUrl = `https://sh.dataspace.copernicus.eu/wms?` +
       `SERVICE=WMS&` +
       `REQUEST=GetMap&` +
-      `LAYERS=S5P_L2__CO_____&` +
-      `STYLES=RASTER/CO_VISUALIZED&` +
+      `LAYERS=${config.wmsLayer}&` +
+      `STYLES=${config.style}&` +
       `FORMAT=image/png&` +
       `TRANSPARENT=true&` +
       `TIME=${isoDate}T00:00:00Z/${isoDate}T23:59:59Z&` +
@@ -50,12 +91,14 @@ async function loadCOLayer(date) {
       `CRS=EPSG:3857&` +
       `BBOX=-20037508.34,-20037508.34,20037508.34,20037508.34&` +
       `ACCESS_TOKEN=${accessToken}&` +
-      `COLORSCALERANGE=0,0.12`;
+      `COLORSCALERANGE=${config.colorscalerange}`;
 
-    // Add layer
-    coLayer = L.imageOverlay(wmsUrl, [[-85.06, -180], [85.06, 180]], {
+    // Add new layer
+    currentLayer = L.imageOverlay(wmsUrl, [[-85.06, -180], [85.06, 180]], {
       opacity: 0.85
     }).addTo(map);
+
+    updateLegend(layerType);
 
   } catch (error) {
     alert(`Error: ${error.message}`);
@@ -65,14 +108,14 @@ async function loadCOLayer(date) {
   }
 }
 
-// Initialize
+// Initialize application
 document.addEventListener('DOMContentLoaded', async () => {
   initMap();
   
-  document.getElementById('dateInput').addEventListener('change', (e) => {
-    loadCOLayer(new Date(e.target.value));
-  });
+  // Event listeners
+  document.getElementById('layerSelector').addEventListener('change', loadLayer);
+  document.getElementById('dateInput').addEventListener('change', loadLayer);
 
   // Initial load
-  await loadCOLayer(new Date('2023-06-15'));
+  await loadLayer();
 });
