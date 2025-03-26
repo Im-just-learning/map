@@ -18,10 +18,14 @@ flatpickr("#datePicker", {
 
 // Function to update the Copernicus WMS layer
 function updateCopernicusLayer(date) {
-  // Remove old layer if it exists
-  if (window.copernicusLayer) {
-    map.removeLayer(window.copernicusLayer);
-  }
+  if (window.copernicusLayer) map.removeLayer(window.copernicusLayer);
+  
+  // Use a proxy (replace "YOUR_PROXY_URL" with a free service like https://cors-anywhere.herokuapp.com/)
+  const proxyUrl = "https://cors-anywhere.herokuapp.com/";
+  const wmsUrl = `${proxyUrl}https://wms.dataspace.copernicus.eu/wms?request=GetMap&layers=S5_CO_CDAS&time=${date}&format=image/png&transparent=true`;
+  
+  window.copernicusLayer = L.tileLayer(wmsUrl).addTo(map);
+}
 
   // Add new layer with selected date
   window.copernicusLayer = L.tileLayer.wms('https://wms.dataspace.copernicus.eu/wms', {
