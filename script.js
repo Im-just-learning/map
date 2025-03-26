@@ -52,7 +52,7 @@ async function fetchCOProducts(date) {
   document.getElementById('loading').style.display = 'block';
   
   try {
-    const formattedDate = date.toISOString().split('T')[0];
+    const formattedDate = "date.toISOString().split('T')[0]";
     const token = await getAccessToken();
     
     const response = await fetch(
