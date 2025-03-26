@@ -6,50 +6,69 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap'
 }).addTo(map);
 
-// 1. Configure Copernicus WMS Layer (CO Visualization)
-const copernicusCOLayer = L.tileLayer.wms('https://wms.dataspace.copernicus.eu/wms', {
-    layers: 'S5_CO_CDAS',
-    styles: 'RASTER/CO_VISUALIZED',
-    format: 'image/png',
-    transparent: true,
-    version: '1.3.0',
-    attribution: 'Copernicus Atmosphere Monitoring Service'
-});
+// 1. MODIFIED: WMS Layer with token support
+let copernicusCOLayer = null;
 
-// 2. Set up date picker with enhanced options
+async function createCOLayer(date) {
+    const token = await getAccessToken();
+    return L.tileLayer.wms('https://wms.dataspace.copernicus.eu/wms', {
+        layers: 'S5_CO_CDAS',
+        styles: 'RASTER/CO_VISUALIZED',
+        format: 'image/png',
+        transparent: true,
+        version: '1.3.0',
+        access_token: token,  // Add token here
+        time: date
+    });
+}
+
+// 2. UPDATED: Date picker with async handler
 const datePicker = flatpickr("#datePicker", {
     dateFormat: "Y-m-d",
     defaultDate: "2024-01-15",
-    maxDate: "today", // Restrict to past dates
-    onChange: function(selectedDates) {
+    maxDate: "today",
+    onChange: async function(selectedDates) {
         const date = selectedDates[0].toISOString().split('T')[0];
-        updateCOLayer(date);
+        await updateCOLayer(date);
     }
 });
 
-// 3. Update WMS layer with new date
-function updateCOLayer(date) {
-    // Show loading state
+// 3. MODIFIED: Update function with token handling
+async function updateCOLayer(date) {
     document.getElementById('loading').style.display = 'block';
     
-    copernicusCOLayer.setParams({
-        time: date,
-        // Optional: Add cloud coverage filter (0-30%)
-        // cql_filter: "cloudCover<=30" 
-    });
-    
-    // Add layer if not already on map
-    if (!map.hasLayer(copernicusCOLayer)) {
+    try {
+        // Remove old layer if exists
+        if (copernicusCOLayer) {
+            map.removeLayer(copernicusCOLayer);
+        }
+        
+        // Create new layer with fresh token
+        copernicusCOLayer = await createCOLayer(date);
         copernicusCOLayer.addTo(map);
-    }
-    
-    // Hide loading after short delay (better UX)
-    setTimeout(() => {
+        
+        // Set up auto-refresh (every 5 minutes)
+        if (!window.tokenRefreshInterval) {
+            window.tokenRefreshInterval = setInterval(async () => {
+                const newToken = await getAccessToken();
+                copernicusCOLayer.setParams({ access_token: newToken });
+            }, 300000); // 5 minutes
+        }
+        
+        // Error handling for the new layer
+        copernicusCOLayer.on('tileerror', function() {
+            alert('Failed to load CO data tiles. Token may have expired.');
+        });
+        
+    } catch (error) {
+        console.error("CO Layer Error:", error);
+        alert("Failed to load CO data: " + error.message);
+    } finally {
         document.getElementById('loading').style.display = 'none';
-    }, 500);
+    }
 }
 
-// 4. Add professional legend (matches Copernicus exactly)
+// 4. Legend (unchanged)
 const legend = L.control({position: 'bottomright'});
 legend.onAdd = function() {
     const div = L.DomUtil.create('div', 'legend');
@@ -68,18 +87,11 @@ legend.onAdd = function() {
 };
 legend.addTo(map);
 
-// 5. Initial load
-updateCOLayer(datePicker.input.value);
-
-// 6. Error handling for WMS
-copernicusCOLayer.on('load', function() {
-    document.getElementById('loading').style.display = 'none';
-});
-
-copernicusCOLayer.on('loading', function() {
-    document.getElementById('loading').style.display = 'block';
-});
-
-copernicusCOLayer.on('tileerror', function() {
-    alert('Failed to load CO data. The server may be unavailable or your access token expired.');
-});
+// 5. MODIFIED: Initial load with async wrapper
+(async function init() {
+    try {
+        await updateCOLayer(datePicker.input.value);
+    } catch (error) {
+        console.error("Initialization failed:", error);
+    }
+})();
