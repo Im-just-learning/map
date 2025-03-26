@@ -1,76 +1,73 @@
-// Initialize map with Copernicus' default view
+// Map initialization
 const map = L.map('map').setView([20.27594, -74.66599], 4);
-
-// Add base map
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap'
 }).addTo(map);
 
-// 1. MODIFIED: WMS Layer with token support
-let copernicusCOLayer = null;
+// CO Layer Management
+let coLayer = null;
+let tokenRefreshInterval = null;
 
 async function createCOLayer(date) {
     const token = await getAccessToken();
-    return L.tileLayer.wms('https://wms.dataspace.copernicus.eu/wms', {
+    return L.tileLayer.wms('https://sh.dataspace.copernicus.eu/wms', {
         layers: 'S5_CO_CDAS',
         styles: 'RASTER/CO_VISUALIZED',
         format: 'image/png',
         transparent: true,
         version: '1.3.0',
-        access_token: token,  // Add token here
-        time: date
+        crs: L.CRS.EPSG3857,
+        access_token: token,
+        time: date,
+        attribution: 'Copernicus Atmosphere Monitoring Service'
     });
 }
 
-// 2. UPDATED: Date picker with async handler
-const datePicker = flatpickr("#datePicker", {
-    dateFormat: "Y-m-d",
-    defaultDate: "2024-01-15",
-    maxDate: "today",
-    onChange: async function(selectedDates) {
-        const date = selectedDates[0].toISOString().split('T')[0];
-        await updateCOLayer(date);
-    }
-});
-
-// 3. MODIFIED: Update function with token handling
 async function updateCOLayer(date) {
     document.getElementById('loading').style.display = 'block';
     
     try {
-        // Remove old layer if exists
-        if (copernicusCOLayer) {
-            map.removeLayer(copernicusCOLayer);
+        // Clear existing layer
+        if (coLayer) {
+            map.removeLayer(coLayer);
+            coLayer = null;
         }
-        
-        // Create new layer with fresh token
-        copernicusCOLayer = await createCOLayer(date);
-        copernicusCOLayer.addTo(map);
-        
-        // Set up auto-refresh (every 5 minutes)
-        if (!window.tokenRefreshInterval) {
-            window.tokenRefreshInterval = setInterval(async () => {
-                const newToken = await getAccessToken();
-                copernicusCOLayer.setParams({ access_token: newToken });
+
+        // Create new layer
+        coLayer = await createCOLayer(date);
+        coLayer.addTo(map);
+
+        // Set up token refresh
+        if (!tokenRefreshInterval) {
+            tokenRefreshInterval = setInterval(async () => {
+                try {
+                    const newToken = await getAccessToken();
+                    coLayer.setParams({ access_token: newToken });
+                } catch (error) {
+                    console.error("Token refresh failed:", error);
+                }
             }, 300000); // 5 minutes
         }
-        
-        // Error handling for the new layer
-        copernicusCOLayer.on('tileerror', function() {
-            alert('Failed to load CO data tiles. Token may have expired.');
-        });
-        
+
     } catch (error) {
         console.error("CO Layer Error:", error);
-        alert("Failed to load CO data: " + error.message);
+        alert(`Failed to load data: ${error.message}`);
     } finally {
         document.getElementById('loading').style.display = 'none';
     }
 }
 
-// 4. Legend (unchanged)
+// Date picker
+const datePicker = flatpickr("#datePicker", {
+    dateFormat: "Y-m-d",
+    defaultDate: "2024-01-15",
+    maxDate: "today",
+    onChange: (dates) => updateCOLayer(dates[0].toISOString().split('T')[0])
+});
+
+// Legend
 const legend = L.control({position: 'bottomright'});
-legend.onAdd = function() {
+legend.onAdd = () => {
     const div = L.DomUtil.create('div', 'legend');
     div.innerHTML = `
         <h4>CO Column (mol/m²)</h4>
@@ -87,11 +84,10 @@ legend.onAdd = function() {
 };
 legend.addTo(map);
 
-// 5. MODIFIED: Initial load with async wrapper
-(async function init() {
-    try {
-        await updateCOLayer(datePicker.input.value);
-    } catch (error) {
-        console.error("Initialization failed:", error);
-    }
-})();
+// Initial load
+updateCOLayer(datePicker.input.value);
+
+// Cleanup on window close
+window.addEventListener('beforeunload', () => {
+    if (tokenRefreshInterval) clearInterval(tokenRefreshInterval);
+});
