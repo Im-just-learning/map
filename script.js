@@ -15,7 +15,7 @@ function initMap() {
 async function getToken() {
     try {
         const response = await fetch(
-            'https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token',
+            curl -s -X POST https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
